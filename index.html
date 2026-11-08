@@ -70,7 +70,7 @@ input[type=text]:focus,input[type=number]:focus{outline:2px solid var(--accent);
 .go{flex-basis:100%;display:flex;justify-content:center}
 .opts{flex-basis:100%;display:flex;flex-wrap:wrap;justify-content:flex-start;gap:6px 22px;font-size:12px;color:var(--muted)}
 .opts label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
-#fp-x-wrap input{width:52px;padding:2px 5px}
+#fp-x-wrap input,#peel-x-wrap input{width:52px;padding:2px 5px}
 .opt{display:inline-flex;align-items:center;gap:5px;position:relative}
 .info{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid var(--muted);color:var(--muted);font:italic 700 10px Georgia,serif;cursor:help;position:relative;outline:none}
 .info:hover,.info:focus{border-color:var(--ink);color:var(--ink)}
@@ -314,7 +314,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
   <h3>Rules</h3>
   <ul><li>A transaction is a link when it has exactly 1 input and 2 outputs with different amounts.</li>
   <li>The next link is the transaction in the graph that spends the <b>larger</b> output. That transaction must also be a link.</li>
-  <li>TRACEY marks 3 or more links in a sequence as one chain. Each transaction gets an indigo tag “peel 1, 2, …” with its hop number.</li>
+  <li>TRACEY marks a sequence of links as one chain when the sequence has the minimum length or more. You set the minimum length next to “show peelchains” (default 3). Each transaction gets an indigo tag “peel 1, 2, …” with its hop number.</li>
   <li>Put the pointer on the tag to see the length of the chain, the total amount peeled off and the number of blocks. You also see if all fee rates are whole numbers. Whole-number fee rates are a sign of automatic software.</li></ul>
   <h3>Limits</h3>
   <p>TRACEY finds only chains that the graph shows. Expand transactions to follow a chain farther. This heuristic depends on a change guess. TRACEY assumes that the larger output is the change, which is the remaining amount. It does not use the “show change” rules for this. If the larger output is a payment, the chain follows the receiver and not the sender. Then the chain and the total amount peeled off are incorrect. The larger output is usually the change, but not always. A long chain is more reliable, because each transaction in it must have the same form. A person who makes many usual payments in a sequence from one coin looks the same.</p>
@@ -354,7 +354,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
       <span class="opt"><label><input type="checkbox" id="s-own"> show common ownership</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Common ownership</b>TRACEY counts addresses that pay into the same transaction as one wallet. The links connect: A+B and B+C make one wallet.<br>TRACEY does not use coinjoins (mempool.space rules).<br>Each wallet in the graph that these rules apply to gets a tag and its own colour.</span></span></span>
       <span class="opt"><label><input type="checkbox" id="s-cj"> show coinjoin</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>coinjoin</b>mempool.space rules. All must be true:<br>1. a minimum of 5 inputs and 5 outputs<br>2. different input amounts + different output amounts are a maximum of half of all inputs + outputs<br>3. no output address occurs two times<br>4. no inscription or OP_RETURN<br>5. the ratio of inputs to outputs is between 1:5 and 5:1<br>A yellow cj badge shows a coinjoin.</span></span></span>
       <span class="opt"><label><input type="checkbox" id="s-fp"> show behavioral fingerprint</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Behavioral fingerprint</b>A behavioral fingerprint shows that transactions probably come from the same wallet software or setup. It does not show the same person or the same wallet. Unusual fingerprints with rare custom setups can show the same service. Behavioral heuristics are the least reliable heuristics.<br><br><b>Known wallets</b>All known wallets have one colour. TRACEY removes each wallet whose default settings do not agree with the transaction. It compares the version, locktime, exact nSequence, signatures, order of inputs and outputs, change and address reuse. The list contains Bitcoin Core, Electrum, Sparrow, BlueWallet, Trezor Suite, BitBoxApp and Ledger Live. TRACEY compared each wallet with its current code (Nov 2026). The method comes from the 2023 study by Ishaana Misra. Trezor Suite and BitBoxApp look the same on the blockchain. TRACEY does not show a Wasabi Wallet tag, because Wasabi makes its transactions look like usual network traffic. Coldcard only signs, and it has no fingerprint of its own. If 3 or fewer wallets agree, the tag shows all of them.<br><br><b>Unusual fingerprints</b>These are transactions that do not agree with a known wallet. 2 or more wallets get the same “fingerprint” tag when they have the same traits. The number of these traits must be equal to or more than the setting. There are 9 traits: version 1, locktime 0, RBF off, BIP69 inputs (3+), BIP69 outputs (3+), the same whole-number fee rate, the same multisig or other rare input type, change to the same rare address type (P2WSH, P2SH or P2PKH), and transactions within 6 blocks of each other. TRACEY does not use coinjoins.</span></span><span id="fp-x-wrap" hidden><label>unusual traits ≥ <input type="number" id="s-fpx" min="1" max="9" value="9"> /9</label></span></span>
-      <span class="opt"><label><input type="checkbox" id="s-peel"> show peelchains</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Peel chain</b>A peel chain is a sequence of transactions. Each transaction spends one coin and pays out (“peels off”) a smaller amount. It sends the larger remaining amount to a new address. The next transaction spends that address in the same way.<br>TRACEY marks 3 or more of these transactions in a sequence: 1 input, 2 outputs, and the next transaction spends the larger output.<br>Peel chains frequently come from automatic software. Services that pay out money make them. Persons who move money in steps also make them.<br>The larger output is a guess for the change. If this guess is incorrect, the chain is incorrect.</span></span></span>
+      <span class="opt"><label><input type="checkbox" id="s-peel"> show peelchains</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Peel chain</b>A peel chain is a sequence of transactions. Each transaction spends one coin and pays out (“peels off”) a smaller amount. It sends the larger remaining amount to a new address. The next transaction spends that address in the same way.<br>TRACEY marks a sequence of these transactions: 1 input, 2 outputs, and the next transaction spends the larger output. The sequence must have the minimum length that you set (default 3) or more.<br>Peel chains frequently come from automatic software. Services that pay out money make them. Persons who move money in steps also make them.<br>The larger output is a guess for the change. If this guess is incorrect, the chain is incorrect.</span></span><span id="peel-x-wrap" hidden><label>minimum length ≥ <input type="number" id="s-peelx" min="2" max="100" value="3"> transactions</label></span></span>
       <a class="hlink" href="#heuristics" target="_blank" rel="noopener">learn more about heuristics</a>
     </div>
     <div class="go"><button id="traceBtn">TRACE</button></div>
@@ -439,7 +439,7 @@ document.querySelector('h1 .logo').addEventListener('click', () => { document.bo
 const rowsEl = $('rows');
 const STORE = 'tracey-v1';
 function saveState(){
-  try { localStorage.setItem(STORE, JSON.stringify({rows: readRows(), settings: readSettingsRaw(), change: $('s-change').checked, own: $('s-own').checked, cj: $('s-cj').checked, fp: $('s-fp').checked, fpx: $('s-fpx').value, peel: $('s-peel').checked})); } catch(e) {}
+  try { localStorage.setItem(STORE, JSON.stringify({rows: readRows(), settings: readSettingsRaw(), change: $('s-change').checked, own: $('s-own').checked, cj: $('s-cj').checked, fp: $('s-fp').checked, fpx: $('s-fpx').value, peel: $('s-peel').checked, peelx: $('s-peelx').value})); } catch(e) {}
 }
 function loadState(){
   try { return JSON.parse(localStorage.getItem(STORE) || 'null'); } catch(e) { return null; }
@@ -504,10 +504,14 @@ $('addRow').addEventListener('click', () => { addRow().querySelector('.ia').focu
   if (st && st.peel) $('s-peel').checked = true;
   if (st && st.fpx) $('s-fpx').value = st.fpx;
   $('fp-x-wrap').hidden = !$('s-fp').checked;
+  if (st && st.peelx) $('s-peelx').value = st.peelx;
+  $('peel-x-wrap').hidden = !$('s-peel').checked;
 })();
 // "show likely change" only changes how the graph is drawn, so it redraws without tracing again
 $('s-fp').addEventListener('change', () => { $('fp-x-wrap').hidden = !$('s-fp').checked; });
 $('s-fpx').addEventListener('input', () => { saveState(); if (G) render(true); });
+$('s-peel').addEventListener('change', () => { $('peel-x-wrap').hidden = !$('s-peel').checked; });
+$('s-peelx').addEventListener('input', () => { saveState(); if (G) render(true); });
 ['s-change', 's-own', 's-cj', 's-fp', 's-peel'].forEach(id => $(id).addEventListener('change', () => { saveState(); if (G) render(true); }));
 // labels added in the graph: only ever saved in this browser, never written into the input table
 let graphLabels = {};
@@ -1198,7 +1202,7 @@ function renderGraph(keepView){
     });
   }
   // "show peel chain": 3+ transactions in a row, each 1 input -> 2 outputs, where the next one spends the larger output
-  const showPeel = $('s-peel').checked;
+  const showPeel = $('s-peel').checked, peelX = Math.max(2, parseInt($('s-peelx').value, 10) || 3);
   $('lg-peel').hidden = !showPeel;
   const peelOf = {};
   if (showPeel) {
@@ -1216,7 +1220,7 @@ function renderGraph(keepView){
     Object.keys(next).filter(id => !prev[id]).forEach(start => {
       const chain = [start];
       while (next[chain[chain.length - 1]] && chain.length < 10000) chain.push(next[chain[chain.length - 1]]);
-      if (chain.length < 3) return;
+      if (chain.length < peelX) return;
       const hs = chain.map(id => G.txinfo[id].block).filter(Boolean);
       const peeled = chain.reduce((sum, id) => { const t = RAW[id]; return sum + t.vout[1 - bigOf(t)].value; }, 0);
       const whole = chain.every(id => { const t = RAW[id], vs = Math.ceil((t.weight || 0) / 4), r = vs ? t.fee / vs : 0; return r >= 1 && Math.abs(r - Math.round(r)) < 0.05; });
