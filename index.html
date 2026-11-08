@@ -529,19 +529,28 @@ function labelMap(){
 /* ---------------- mempool.space fetching ---------------- */
 const cache = new Map();
 let lastReq = 0, nReq = 0, stopFlag = false;
+// the job that is loading now (a trace or a + expansion), and the switch that cancels its open request.
+// TRACE never waits for the button: it stops the running job (stopJob) and then starts the new trace.
+let busy = null, abortCtl = null, traceRun = 0;
+// a wait that ends early when the running job is stopped
+const nap = async ms => { const end = Date.now() + ms; while (!stopFlag && Date.now() < end) await sleep(Math.min(100, end - Date.now())); };
+async function stopJob(){ if (!busy) return; stopFlag = true; if (abortCtl) abortCtl.abort(); try { await busy; } catch (e) {} }
+function startJob(){ stopFlag = false; abortCtl = new AbortController(); let done; busy = new Promise(r => done = r); return () => { busy = null; done(); }; }
 async function get(path){
   if (cache.has(path)) return cache.get(path);
   for (let attempt = 0; ; attempt++) {
     if (stopFlag) throw new Error('stopped');
-    const wait = lastReq + GAP - Date.now(); if (wait > 0) await sleep(wait);
+    const wait = lastReq + GAP - Date.now(); if (wait > 0) await nap(wait);
+    if (stopFlag) throw new Error('stopped');
     lastReq = Date.now(); nReq++;
     let r;
-    try { r = await fetch(API + path); }
+    try { r = await fetch(API + path, abortCtl ? {signal: abortCtl.signal} : undefined); }
     // mempool.space's rate-limit replies carry no CORS header, so the browser reports them as network errors: back off and retry
-    catch (e) { if (attempt < 6) { const w = 2000 * 2 ** attempt; setStatus(`mempool.space did not answer (probably a rate limit). TRACEY tries again in ${w / 1000} s…`); await sleep(w); continue; } throw new Error('Network error: TRACEY cannot get ' + path + ' from mempool.space'); }
-    if ((r.status === 429 || r.status >= 500) && attempt < 5) { setStatus(`mempool.space limits the number of requests (HTTP ${r.status}). TRACEY waits…`); await sleep(2000 * 2 ** attempt); continue; }
+    catch (e) { if (stopFlag) throw new Error('stopped'); if (attempt < 6) { const w = 2000 * 2 ** attempt; setStatus(`mempool.space did not answer (probably a rate limit). TRACEY tries again in ${w / 1000} s…`); await nap(w); continue; } throw new Error('Network error: TRACEY cannot get ' + path + ' from mempool.space'); }
+    if ((r.status === 429 || r.status >= 500) && attempt < 5) { setStatus(`mempool.space limits the number of requests (HTTP ${r.status}). TRACEY waits…`); await nap(2000 * 2 ** attempt); continue; }
     if (!r.ok) throw new Error(`mempool.space sent HTTP ${r.status} for ${path}`);
-    const j = await r.json(); cache.set(path, j); return j;
+    let j; try { j = await r.json(); } catch (e) { if (stopFlag) throw new Error('stopped'); throw e; }
+    cache.set(path, j); return j;
   }
 }
 async function addressTxs(a, chainCount){
@@ -767,7 +776,7 @@ async function fetchPrevHeights(txs){
     for (const tx of txs) for (const v of tx.vin) {
       if (PREV_H[v.txid] !== undefined) continue;
       try { const st = await get(`/tx/${v.txid}/status`); PREV_H[v.txid] = st.confirmed ? st.block_height : -1; }
-      catch (e) { PREV_H[v.txid] = -1; }
+      catch (e) { if (stopFlag) return; PREV_H[v.txid] = -1; }
     }
   } finally { fpFetching = false; }
   if (G) render(true);
@@ -885,9 +894,9 @@ async function backHop(c, tx){
 // the + above an address: load up to 10 more of its transactions in both directions
 // (where it sent money, and who paid it); "+ N hidden" then shows what is left
 async function expandNode(a){
-  const n = G && G.nodes[a]; if (!n || $('traceBtn').disabled) return;
+  const n = G && G.nodes[a]; if (!n || busy) return;
   pushHistory();
-  $('traceBtn').disabled = true; stopFlag = false;
+  const endJob = startJob();
   const before = Object.keys(G.txinfo).length;
   const p0 = lastPos[a], sx = p0 ? p0.x * s + tx : 0, sy = p0 ? p0.y * s + ty : 0, mv0 = viewMoves;
   let failed = null;
@@ -917,7 +926,9 @@ async function expandNode(a){
       delete n.stopWhy; n.expanded = true; n.backDone = true; n.allLoaded = true; G.done[a] = Math.max(G.done[a] ?? 0, 1);
     }
   } catch (e) { failed = e; }
-  $('traceBtn').disabled = false;
+  endJob();
+  // TRACE was clicked while this loaded: the new trace replaces the graph, so draw nothing here
+  if (failed && failed.message === 'stopped') return;
   render(true);
   // keep the address at the same spot on screen, unless the view was moved while it loaded
   const p1 = lastPos[a]; if (p0 && p1 && viewMoves === mv0) { tx = sx - p1.x * s; ty = sy - p1.y * s; apply(); }
@@ -947,11 +958,16 @@ async function runTrace(){
   if (bad.length) { setStatus(`This is not a valid Bitcoin address or transaction ID: ${bad.map(r => r.addr).join(', ')}`, true); return; }
   const starts = rows;
   if (!starts.length) { setStatus('Add one or more addresses or transaction IDs.', true); return; }
+  // a trace or expansion is still loading: stop it first. Only the last click goes on.
+  const my = ++traceRun;
+  await stopJob();
+  if (my !== traceRun) return;
   showGraph();
   pushHistory();
-  S = readSettings(); G = newGraph(); queue = []; nReq = 0; stopFlag = false;
+  const endJob = startJob();
+  S = readSettings(); G = newGraph(); queue = []; nReq = 0;
   starts.forEach((r, i) => { if (!G.given[r.addr]) G.given[r.addr] = Object.keys(G.given).length + 1; });
-  $('traceBtn').disabled = true; $('back').disabled = true; $('empty').style.display = 'none';
+  $('back').disabled = true; $('empty').style.display = 'none';
   // the view is fitted to the graph only on the first draw; after that it stays where the user put it
   let lastDraw = Date.now(), failed = null, fitted = false;
   const draw = () => { render(fitted); fitted = true; };
@@ -967,16 +983,19 @@ async function runTrace(){
       }
     }
   } catch (e) { failed = e; }
+  endJob();
+  // a newer TRACE click stopped this trace: that trace draws the graph and shows the result
+  if (my !== traceRun) return;
   // anything still waiting in the queue was not reached
   queue.forEach(q => { const n = G.nodes[q.a]; if (n && !n.expanded && !n.service) n.stopWhy = n.stopWhy || 'not followed (trace stopped)'; });
   draw();
-  $('traceBtn').disabled = false; try { updateBack(); } catch (e) {}
+  try { updateBack(); } catch (e) {}
   const summary = `${nAddr()} addresses, ${Object.keys(G.txinfo).length} transactions, ${nReq} requests to mempool.space`;
   if (failed) setResult((failed.message === 'stopped' ? 'Stopped. ' : failed.message + '. ') + 'The graph shows the results until now: ' + summary, failed.message !== 'stopped');
   else setResult('Done: ' + summary + (G.capped ? ` (TRACEY reached the limit of ${S.max} addresses. Increase "max addresses" to go farther)` : ''));
 }
 $('traceBtn').addEventListener('click', runTrace);
-document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.closest && ev.target.closest('#panel') && ev.target.tagName === 'INPUT' && !$('traceBtn').disabled) runTrace(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.closest && ev.target.closest('#panel') && ev.target.tagName === 'INPUT') runTrace(); });
 
 /* ---------------- expanding a transaction + back button ---------------- */
 // counts the inputs/outputs (by address) of a transaction that are not drawn yet
