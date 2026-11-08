@@ -81,6 +81,12 @@ input[type=text]:focus,input[type=number]:focus{outline:2px solid var(--accent);
 @media print{ .info{display:none} }
 #traceBtn{background:var(--accent);color:#000;font-weight:800;border:0;padding:8px 26px;letter-spacing:.1em;font-size:14px}
 #status{font-size:12px;color:var(--muted);flex-basis:100%}
+/* shown under TRACE while a trace loads: magenta text and a spinning wheel */
+#loading{flex-basis:100%;display:flex;justify-content:center;align-items:center;gap:8px;color:var(--accent);font-weight:700;font-size:13px}
+#loading[hidden]{display:none}
+#loading .spin{width:14px;height:14px;border:2.5px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){ #loading .spin{animation-duration:2.4s} }
 #status.err{color:var(--bad)}
 #result.err{color:var(--bad)}
 .hint{font-size:12px;color:var(--muted);margin:10px 0 0}
@@ -360,6 +366,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
       <a class="hlink" href="#heuristics" target="_blank" rel="noopener">learn more about heuristics</a>
     </div>
     <div class="go"><button id="traceBtn">TRACE</button></div>
+    <div id="loading" role="status" hidden><span class="spin" aria-hidden="true"></span>Trace loading, fetching transactions</div>
     <span id="status"></span>
   </div>
   <p class="hint" id="hint">Type Bitcoin addresses or transaction IDs. You can also type labels. TRACEY traces each address in the list. For a transaction ID, TRACEY shows the addresses that paid into it and the sources of those coins (one hop back). It also traces each output forward. You can paste a list with one address on each line. After an address, you can add a comma and a label.</p>
@@ -965,6 +972,7 @@ async function runTrace(){
   showGraph();
   pushHistory();
   const endJob = startJob();
+  $('loading').hidden = false;
   S = readSettings(); G = newGraph(); queue = []; nReq = 0;
   starts.forEach((r, i) => { if (!G.given[r.addr]) G.given[r.addr] = Object.keys(G.given).length + 1; });
   $('back').disabled = true; $('empty').style.display = 'none';
@@ -986,6 +994,7 @@ async function runTrace(){
   endJob();
   // a newer TRACE click stopped this trace: that trace draws the graph and shows the result
   if (my !== traceRun) return;
+  $('loading').hidden = true;
   // anything still waiting in the queue was not reached
   queue.forEach(q => { const n = G.nodes[q.a]; if (n && !n.expanded && !n.service) n.stopWhy = n.stopWhy || 'not followed (trace stopped)'; });
   draw();
