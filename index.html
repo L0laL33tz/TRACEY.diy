@@ -609,7 +609,10 @@ function txNode(tx, row){
 }
 function addEdge(from, to, io, value, tx){
   const k = from + '|' + to + '|' + tx.txid;
-  if (G.ekeys[k]) { if (io === 'out') G.ekeys[k].value += value; return; }
+  // an output line always carries the sum of all outputs of this transaction to this address, taken from the raw
+  // transaction, so reaching the same transaction again (e.g. through a second address of the same wallet) can't add it twice
+  if (io === 'out') value = tx.vout.reduce((s, o) => s + (o.scriptpubkey_address === to ? o.value : 0), 0);
+  if (G.ekeys[k]) { if (io === 'out') G.ekeys[k].value = value; return; }
   const e = {from, to, io, value, txid: tx.txid, time: tx.status.block_time};
   G.ekeys[k] = e; G.edges.push(e);
 }
