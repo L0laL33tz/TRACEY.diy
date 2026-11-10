@@ -1143,7 +1143,7 @@ function kind(n){
   return 'dust';
 }
 function describe(n){
-  if (n.isTx) { const t = G.txinfo[n.txid]; return (G.given[n.txid] ? 'Transaction that you supplied #' + G.given[n.txid] + '<br>' : '') + (n.batch ? 'Batch payout transaction. The graph shows only its outputs to addresses that are already in the graph or in your list' : 'Transaction (the graph shows only traced inputs and outputs)') + `<br>${date(t.time)} · block ${t.block ?? '–'}<br>v${t.version} · locktime ${t.locktime} · RBF ${t.rbf ? 'on' : 'off'}`; }
+  if (n.isTx) { const t = G.txinfo[n.txid]; return (G.given[n.txid] ? 'Transaction that you supplied #' + G.given[n.txid] + '<br>' : '') + (n.batch ? 'Batch payout transaction. The graph shows only its outputs to addresses that are already in the graph or in your list' : 'Transaction (the graph shows only traced inputs and outputs)') + `<br>${date(t.time)} · block ${esc(t.block ?? '–')}<br>v${esc(t.version)} · locktime ${esc(t.locktime)} · RBF ${t.rbf ? 'on' : 'off'}`; }
   const parts = [];
   if (G.given[n.addr]) parts.push('Address that you supplied #' + G.given[n.addr]);
   if (n.service) parts.push('Probable exchange / service: ' + privWhy(n.serviceWhy) + '. TRACEY does not follow that payout');
@@ -1406,7 +1406,7 @@ function renderGraph(keepView){
     const c = changeOf(RAW[e.txid]), to = G.nodes[e.to];
     return c && to && c.addr === to.addr ? c.why : null;
   };
-  const tipFor = (e, io) => { const c = changeWhy(e); return `<b>${io === 'in' ? 'Input' : 'Output'}: ${btc(e.value)}</b><br>${date(e.time)}<br>tx ${e.txid.slice(0, 16)}…${c ? '<br><i>' + esc(c) + '</i>' : ''}<br><span class="sub">Click to open the transaction</span>`; };
+  const tipFor = (e, io) => { const c = changeWhy(e); return `<b>${io === 'in' ? 'Input' : 'Output'}: ${btc(e.value)}</b><br>${date(e.time)}<br>tx ${esc(e.txid.slice(0, 16))}…${c ? '<br><i>' + esc(c) + '</i>' : ''}<br><span class="sub">Click to open the transaction</span>`; };
   const inCount = {}, outCount = {}, spends = {};
   const elabels = document.createElementNS(NS, 'g');
   const nodeG = {};
