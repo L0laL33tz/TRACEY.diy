@@ -945,7 +945,7 @@ async function expandNode(a){
       for (const t of txs) { if (inValue(t, a) > 0) spendTx(t, a, 1); else fundTx(t, a); }
       queue.forEach(q => { const m = G.nodes[q.a]; if (m && !m.expanded && !m.service) m.stopWhy = 'TRACEY did not follow this address yet. Click + to expand it'; });
       queue = [];
-      delete n.stopWhy; n.expanded = true; n.backDone = true; n.allLoaded = true; G.done[a] = Math.max(G.done[a] ?? 0, 1);
+      delete n.stopWhy; n.expanded = true; n.backDone = true; G.done[a] = Math.max(G.done[a] ?? 0, 1);
     }
   } catch (e) { failed = e; }
   endJob();
