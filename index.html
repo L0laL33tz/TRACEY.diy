@@ -1397,7 +1397,7 @@ function renderGraph(keepView){
     const p = el('path', {d, class: cls, 'marker-end': `url(#ar-${w ? 'w-' + w.hue : io})`}, link);
     if (w) p.style.setProperty('--wh', w.hue);
     p.style.cursor = 'pointer';
-    p.addEventListener('mousemove', ev => tip(ev, tipFor(e, io)));
+    p.addEventListener('mousemove', ev => { if (priv) return hideTip(); tip(ev, tipFor(e, io)); }); // privacy mode: no amount or txid on hover
     p.addEventListener('mouseleave', hideTip);
     edgeEls.push({p, from: e.from, to: e.to});
     // inputs are labelled just under the spending address (or mid-line when it spends into
