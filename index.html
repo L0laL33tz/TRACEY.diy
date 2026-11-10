@@ -132,6 +132,9 @@ svg{width:100%;height:100%;display:block}
 .node .svc{fill:#fff;font-weight:700}
 .node .given{fill:var(--given);font-weight:700;font-size:11px}
 .colh{font:12px system-ui;fill:var(--muted)}
+/* privacy-mode notice, pinned to the top of the graph; not printed */
+#privnote{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:3;pointer-events:none;background:var(--inbox);color:var(--ink);border:1px solid var(--accent);border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+#privnote[hidden]{display:none}
 #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;display:none;max-width:320px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 #zoom{position:absolute;right:16px;bottom:calc(100% + 10px);flex-direction:column;z-index:4}
 #zoom button{min-width:44px;font-size:18px;font-weight:700;padding:4px 8px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
@@ -161,7 +164,7 @@ svg{width:100%;height:100%;display:block}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body{min-height:0}
   header{padding:6px 16px;position:static}
-  #panel,.controls,#tip,#zoom,#empty,.xtag,.ark,#lbled{display:none !important}
+  #panel,.controls,#tip,#privnote,#zoom,#empty,.xtag,.ark,#lbled{display:none !important}
   main{height:6.6in;min-height:0;border-bottom:0}
   #result{display:none !important} /* the result line can name an address or txid */
 }
@@ -207,6 +210,7 @@ table.tl tbody tr{cursor:pointer}
 table.tl tbody tr:hover{background:var(--line)}
 table.tl td.d{white-space:nowrap}
 table.tl a{color:inherit;text-decoration:none} table.tl a:hover{text-decoration:underline}
+a[data-priv-href]{cursor:pointer}
 table.tl .c{color:var(--muted)}
 table.tl .tl-w{display:inline-block;margin-left:4px;padding:0 5px;border-radius:3px;font:700 10px/15px system-ui,sans-serif;color:var(--wt);vertical-align:1px}
 table.tl .tl-in{display:block;color:var(--in)} table.tl .tl-out{display:block;color:var(--out)}
@@ -388,6 +392,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
     <svg id="svg"><g id="vp"></g></svg>
     <div id="empty">Type addresses above and click TRACE.</div>
     <div id="tip"></div>
+    <div id="privnote" hidden>privacy mode, links inactive</div>
     <div id="lbled"><div class="who" id="le-who"></div><label>Label <input type="text" id="le-l" autocomplete="off" placeholder="e.g. ATTACKER"></label><label>Source <input type="text" id="le-s" autocomplete="off" placeholder="e.g. Arkham, Court Records"></label><div class="btns"><button id="le-del">remove</button><button id="le-x">cancel</button><button id="le-save">save</button></div></div>
   </div>
 </main>
@@ -1097,9 +1102,30 @@ function tlen(t){
   if (TWID[k] == null) { tctx.font = f; TWID[k] = tctx.measureText(t.textContent).width; }
   return TWID[k];
 }
-let swaps = [], priv = false, edgeEls = [], lastPos = {}, gBox = null, viewMoves = 0;
+let swaps = [], priv = false, privAnon = {}, edgeEls = [], lastPos = {}, gBox = null, viewMoves = 0;
 function swap(t, real, anon, bg){ swaps.push({t, real, anon, bg}); }
-function applyPriv(){ swaps.forEach(s => { s.t.textContent = priv ? s.anon : s.real; if (s.bg) s.bg.setAttribute('width', tlen(s.t) + 8); }); }
+function applyPriv(){
+  swaps.forEach(s => { s.t.textContent = priv ? s.anon : s.real; if (s.bg) s.bg.setAttribute('width', tlen(s.t) + 8); });
+  // privacy mode: the mempool.space and Arkham links lose their href, so neither hovering (the browser's status bar)
+  // nor the PDF shows a real address or txid. A click still opens them, see the click handler below
+  if (priv) document.querySelectorAll(`a[href^="${MS}/"], a[href^="${ARKHAM}"]`).forEach(a => { a.dataset.privHref = a.getAttribute('href'); a.removeAttribute('href'); });
+  else document.querySelectorAll('a[data-priv-href]').forEach(a => { a.setAttribute('href', a.dataset.privHref); delete a.dataset.privHref; });
+  if (leAddr) $('le-who').textContent = whoText(leAddr);
+  $('privnote').hidden = !priv; placeNote();
+}
+// keep the privacy notice at the top of the visible part of the graph, below the sticky header, also when the
+// page (or any scroll box around the graph) scrolls
+function placeNote(){
+  const pn = $('privnote'); if (pn.hidden) return;
+  const hb = document.querySelector('header').getBoundingClientRect().bottom, w = wrap.getBoundingClientRect();
+  pn.style.top = Math.max(10, Math.min(hb - w.top + 10, w.height - pn.offsetHeight - 10)) + 'px';
+}
+document.addEventListener('scroll', placeNote, {capture: true, passive: true});
+window.addEventListener('resize', placeNote);
+// capture phase, because the graph's own click handlers stop the event before it reaches the document
+document.addEventListener('click', ev => { const a = ev.target.closest && ev.target.closest('a[data-priv-href]'); if (a) window.open(a.dataset.privHref, '_blank', 'noopener'); }, true);
+// in privacy mode the "probable service" explanation drops its txid prefix
+const privWhy = s => priv ? String(s || '').replace(/ \(tx [0-9a-f]{8}…\)/g, '') : (s || '');
 $('privacy').addEventListener('click', () => { priv = !priv; applyPriv(); });
 $('theme').addEventListener('click', () => {
   const r = document.documentElement, cur = r.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -1117,7 +1143,7 @@ function describe(n){
   if (n.isTx) { const t = G.txinfo[n.txid]; return (G.given[n.txid] ? 'Transaction that you supplied #' + G.given[n.txid] + '<br>' : '') + (n.batch ? 'Batch payout transaction. The graph shows only its outputs to addresses that are already in the graph or in your list' : 'Transaction (the graph shows only traced inputs and outputs)') + `<br>${date(t.time)} · block ${t.block ?? '–'}<br>v${t.version} · locktime ${t.locktime} · RBF ${t.rbf ? 'on' : 'off'}`; }
   const parts = [];
   if (G.given[n.addr]) parts.push('Address that you supplied #' + G.given[n.addr]);
-  if (n.service) parts.push('Probable exchange / service: ' + n.serviceWhy + '. TRACEY does not follow that payout');
+  if (n.service) parts.push('Probable exchange / service: ' + privWhy(n.serviceWhy) + '. TRACEY does not follow that payout');
   else if (n.funder && !n.expanded) parts.push('Paid into a transaction in the graph. TRACEY did not follow it yet. Click + to expand it');
   else if (n.stopWhy) parts.push(n.stopWhy);
   else if (!n.expanded) parts.push('TRACEY did not follow this address');
@@ -1358,6 +1384,7 @@ function renderGraph(keepView){
 
   // privacy numbering: top to bottom, then left to right
   const anonAddr = {}, anonLabel = {}, anonTx = {};
+  privAnon = anonAddr;
   nodes.filter(n => pos[n.id]).sort((p, q) => pos[p.id].y - pos[q.id].y || pos[p.id].x - pos[q.id].x).forEach(n => {
     if (!n.isTx) anonAddr[n.addr] = 'address ' + (Object.keys(anonAddr).length + 1);
     else anonTx[n.txid] = Object.keys(anonTx).length + 1;
@@ -1462,7 +1489,7 @@ function renderGraph(keepView){
       bg.setAttribute('width', tlen(st) + 8);
       // the reason shows on hover
       bg.addEventListener('mousedown', ev => ev.stopPropagation());
-      bg.addEventListener('mousemove', ev => { ev.stopPropagation(); tip(ev, `<b>probably a business, exchange or service</b><br>${esc(n.serviceWhy || '')}<br><span class="sub">heuristic, not proof</span>`); });
+      bg.addEventListener('mousemove', ev => { ev.stopPropagation(); tip(ev, `<b>probably a business, exchange or service</b><br>${esc(privWhy(n.serviceWhy))}<br><span class="sub">heuristic, not proof</span>`); });
       bg.addEventListener('mouseleave', hideTip);
     }
     const fi = n.isTx && fpOf[n.txid];
@@ -1690,16 +1717,13 @@ function fit(){
 // PDF export: let the SVG scale itself to the page instead of a screen-sized transform
 window.addEventListener('beforeprint', () => { if (!vp.firstChild) return; vp.removeAttribute('transform'); const b = vp.getBBox(); svg.setAttribute('viewBox', `${b.x - 20} ${b.y - 20} ${b.width + 40} ${b.height + 40}`); });
 window.addEventListener('afterprint', fit);
-// privacy mode: the PDF must not carry the real addresses and txids as link targets, so the
-// mempool.space and Arkham links lose their href while printing and get it back afterwards
-window.addEventListener('beforeprint', () => { if (!priv) return; document.querySelectorAll(`a[href^="${MS}/"], a[href^="${ARKHAM}"]`).forEach(a => { a.dataset.privHref = a.getAttribute('href'); a.removeAttribute('href'); }); });
-window.addEventListener('afterprint', () => document.querySelectorAll('a[data-priv-href]').forEach(a => { a.setAttribute('href', a.dataset.privHref); delete a.dataset.privHref; }));
 /* ---------------- labelling an address from the graph ---------------- */
 let leAddr = null;
+const whoText = a => priv ? privAnon[a] || 'address' : a; // privacy mode: the anonymous name, not the address
 function openLabelEditor(a, ev){
   leAddr = a;
   const cur = labelMap()[a] || {};
-  $('le-who').textContent = a;
+  $('le-who').textContent = whoText(a);
   $('le-l').value = cur.label || ''; $('le-s').value = cur.source || '';
   const ed = $('lbled'), r = wrap.getBoundingClientRect();
   ed.style.display = 'block';
