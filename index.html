@@ -1689,6 +1689,10 @@ function fit(){
 // PDF export: let the SVG scale itself to the page instead of a screen-sized transform
 window.addEventListener('beforeprint', () => { if (!vp.firstChild) return; vp.removeAttribute('transform'); const b = vp.getBBox(); svg.setAttribute('viewBox', `${b.x - 20} ${b.y - 20} ${b.width + 40} ${b.height + 40}`); });
 window.addEventListener('afterprint', fit);
+// privacy mode: the PDF must not carry the real addresses and txids as link targets, so the
+// mempool.space and Arkham links lose their href while printing and get it back afterwards
+window.addEventListener('beforeprint', () => { if (!priv) return; document.querySelectorAll(`a[href^="${MS}/"], a[href^="${ARKHAM}"]`).forEach(a => { a.dataset.privHref = a.getAttribute('href'); a.removeAttribute('href'); }); });
+window.addEventListener('afterprint', () => document.querySelectorAll('a[data-priv-href]').forEach(a => { a.setAttribute('href', a.dataset.privHref); delete a.dataset.privHref; }));
 /* ---------------- labelling an address from the graph ---------------- */
 let leAddr = null;
 function openLabelEditor(a, ev){
