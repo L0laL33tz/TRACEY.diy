@@ -575,6 +575,18 @@ async function get(path){
     cache.set(path, j); return j;
   }
 }
+// a new trace must see the chain as it is now: forget address answers and anything that was still
+// unconfirmed. Confirmed transactions never change, so they stay cached (keeps re-tracing fast).
+// "+" and expanding inside a trace keep using the cache.
+function freshCache(){
+  for (const [path, j] of cache) {
+    if (path.startsWith('/address/')) cache.delete(path);
+    else if (/^\/tx\/[0-9a-f]{64}\/status$/.test(path)) { if (!(j && j.confirmed)) cache.delete(path); }
+    else if (/^\/tx\/[0-9a-f]{64}$/.test(path)) { if (!(j && j.status && j.status.confirmed)) cache.delete(path); }
+  }
+  for (const id in PREV_H) if (PREV_H[id] < 0) delete PREV_H[id];
+  for (const id in FP) delete FP[id];   // wallet results can depend on those heights; they are rebuilt without any request
+}
 async function addressTxs(a, chainCount){
   const first = await get(`/address/${a}/txs`);
   const all = [...first], seen = new Set(first.map(t => t.txid));
@@ -987,6 +999,7 @@ async function runTrace(){
   const my = ++traceRun;
   await stopJob();
   if (my !== traceRun) return;
+  freshCache();
   showGraph();
   pushHistory();
   const endJob = startJob();
