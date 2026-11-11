@@ -138,7 +138,7 @@ svg{width:100%;height:100%;display:block}
 #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;display:none;max-width:320px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 #zoom{position:absolute;right:16px;bottom:calc(100% + 10px);flex-direction:column;z-index:4}
 #zoom button{min-width:44px;font-size:18px;font-weight:700;padding:4px 8px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
-#zoom #zreset,#zoom #back{font-size:11px;font-weight:400}
+#zoom #zreset,#zoom #back,#zoom #fwd{font-size:11px;font-weight:400}
 #zoom #back{margin-bottom:8px}
 .xtag{cursor:pointer}
 .xtag .hit{fill:transparent}
@@ -399,7 +399,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
 </main>
 <footer id="foot">
   <!-- zoom / back / reset float just above the footer, so they stay pinned with it while the page scrolls -->
-  <div class="controls" id="zoom"><button id="back" disabled title="Undo the last expansion or TRACE">← back</button><button id="zin">+</button><button id="zout">−</button><button id="zreset">reset</button></div>
+  <div class="controls" id="zoom"><button id="back" disabled title="Undo the last expansion or TRACE">← back</button><button id="fwd" disabled title="Redo the step you went back from">forward →</button><button id="zin">+</button><button id="zout">−</button><button id="zreset">reset</button></div>
   <span class="sub">Click an address, a transaction or a line to open it on mempool.space · Click “view on Arkham” next to an address to open it on Arkham · Click “✎ label” to label an address. Click a label to edit it · Click + above an address to load a maximum of 10 more of its transactions (in and out) · Click a “+ N hidden” tag to show all inputs and outputs of that transaction</span>
   <span class="intro">Each transaction is a grey square. <b class="o">Grey lines are inputs and outputs.</b> An input goes from an address into a transaction: the address spends. The amount is the value of the coin that the address spends. An output goes from a transaction to an address: the transaction pays the address. The arrow shows the direction. The input minus the outputs in the graph is equal to the outputs that TRACEY did not trace, plus the fee. Each square shows its full number of inputs and outputs, and its fee.</span>
   <div class="legend" id="legend">
@@ -1006,7 +1006,7 @@ async function runTrace(){
   $('loading').hidden = false;
   S = readSettings(); G = newGraph(); queue = []; nReq = 0;
   starts.forEach((r, i) => { if (!G.given[r.addr]) G.given[r.addr] = Object.keys(G.given).length + 1; });
-  $('back').disabled = true; $('empty').style.display = 'none';
+  $('back').disabled = true; $('fwd').disabled = true; $('empty').style.display = 'none';
   // the view is fitted to the graph only on the first draw; after that it stays where the user put it
   let lastDraw = Date.now(), failed = null, fitted = false;
   const draw = () => { render(fitted); fitted = true; };
@@ -1082,11 +1082,24 @@ function snapshot(){
   if (!G) return null;
   return JSON.stringify({nodes: G.nodes, edges: G.edges, done: G.done, given: G.given, txinfo: G.txinfo, pos: G.pos, pulled: G.pulled, capped: G.capped, S});
 }
-function pushHistory(){ undoStack.push(snapshot()); updateBack(); }
-function updateBack(){ $('back').disabled = !undoStack.length; }
+// "forward" redoes the steps you went back from. A new trace or expansion starts a new path, so it clears them.
+const redoStack = [];
+function pushHistory(){ undoStack.push(snapshot()); redoStack.length = 0; updateBack(); }
+function updateBack(){ $('back').disabled = !undoStack.length; $('fwd').disabled = !redoStack.length; }
 $('back').addEventListener('click', () => {
   if (!undoStack.length) return;
-  const st = undoStack.pop(); updateBack();
+  redoStack.push(snapshot());
+  restore(undoStack.pop());
+  if (G) setResult(`TRACEY went back one step. You can undo ${undoStack.length} more step${undoStack.length === 1 ? '' : 's'}.`);
+});
+$('fwd').addEventListener('click', () => {
+  if (!redoStack.length) return;
+  undoStack.push(snapshot());
+  restore(redoStack.pop());
+  if (G) setResult(`TRACEY went forward one step. You can redo ${redoStack.length} more step${redoStack.length === 1 ? '' : 's'}.`);
+});
+function restore(st){
+  updateBack();
   if (st === null) {
     G = null; vp.innerHTML = ''; $('meta').textContent = ''; $('summary').hidden = true; setResult(''); $('timeline').hidden = true; $('timeline').innerHTML = ''; $('empty').style.display = '';
     setStatus('Went back: graph cleared.'); return;
@@ -1096,8 +1109,7 @@ $('back').addEventListener('click', () => {
   G.edges.forEach(e => G.ekeys[e.from + '|' + e.to + '|' + e.txid] = e);
   $('empty').style.display = 'none';
   render(true);
-  setResult(`TRACEY went back one step. You can undo ${undoStack.length} more step${undoStack.length === 1 ? '' : 's'}.`);
-});
+}
 
 /* ---------------- drawing ---------------- */
 const NS = 'http://www.w3.org/2000/svg';
