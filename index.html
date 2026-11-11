@@ -258,7 +258,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
   <ul><li>TRACEY counts all input addresses of a transaction as one wallet. This includes inputs that the graph does not show.</li>
   <li>The links connect. For example, A and B are in one transaction, and B and C are in a different transaction. Then A, B and C are one wallet.</li>
   <li>TRACEY does not use transactions that look like a coinjoin (see below). The inputs of a coinjoin belong to different persons.</li>
-  <li>Each wallet in the graph that these rules apply to gets a tag (“wallet A”) and its own colour. The tag and the colour show on its addresses and lines.</li></ul>
+  <li>Each wallet in the graph that these rules apply to gets a tag (“wallet A”) and its own colour. The tag and the colour show on its addresses. The colour also shows on the lines from its addresses into the transactions that spend them. Lines out of a transaction keep their normal colour, because other people's inputs can be in the same transaction.</li></ul>
   <h3>Limits</h3>
   <p>A coinjoin puts the coins of many unrelated persons into one transaction. If TRACEY does not identify a coinjoin, common ownership puts these persons into one wallet. This error then moves along the links to more addresses. PayJoins break the rule intentionally. Exchanges spend the deposits of many customers together. Thus, one “wallet” can be one company, not one person.</p>
   <p class="src">Sources: <a href="https://bitcoin.org/bitcoin.pdf" target="_blank" rel="noopener">Satoshi Nakamoto (2008): Bitcoin whitepaper, section 10</a> · <a href="https://en.bitcoin.it/wiki/Common-input-ownership_heuristic" target="_blank" rel="noopener">Bitcoin Wiki: Common-input-ownership heuristic</a> · <a href="https://cseweb.ucsd.edu/~smeiklejohn/files/imc13.pdf" target="_blank" rel="noopener">Meiklejohn et al. (2013): A Fistful of Bitcoins</a></p>
@@ -1432,7 +1432,9 @@ function renderGraph(keepView){
     const a = pos[e.from], b = pos[e.to]; if (!a || !b) return;
     const io = e.io, fromN = G.nodes[e.from], toN = G.nodes[e.to];
     const chg = changeWhy(e);
-    const w = wallet[(io === 'in' ? fromN : toN).addr];
+    // wallet colour only where the wallet spends (its address -> tx). Lines out of a tx keep their normal colour:
+    // other people's inputs can be in the same tx, so an output does not show who paid it
+    const w = io === 'in' ? wallet[fromN.addr] : null;
     const cls = 'edge ' + io + (chg ? ' change' : '') + (w ? ' own' : '');
     const my = (a.y + b.y) / 2;
     const r1 = fromN.isTx ? 8 : 9, r2 = toN.isTx ? 9 : 11;
