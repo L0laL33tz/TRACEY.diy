@@ -113,7 +113,7 @@ svg{width:100%;height:100%;display:block}
 .node{cursor:pointer}
 .node:hover circle,.node.sel circle,.node:hover rect.txbox,.node.sel rect.txbox{stroke:var(--ink);stroke-width:2.5}
 .edge{fill:none;stroke:var(--edge);stroke-width:1.3}
-.edge.in{stroke:var(--in);stroke-width:1.6}
+.edge.in{stroke:var(--out);stroke-width:1.6}
 .edge.out{stroke:var(--out);stroke-width:1.6}
 .edge.out.change{stroke-dasharray:7 4}
 .edge.own{stroke:hsl(var(--wh) 75% var(--wl))}
@@ -401,7 +401,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
   <!-- zoom / back / reset float just above the footer, so they stay pinned with it while the page scrolls -->
   <div class="controls" id="zoom"><button id="back" disabled title="Undo the last expansion or TRACE">← back</button><button id="zin">+</button><button id="zout">−</button><button id="zreset">reset</button></div>
   <span class="sub">Click an address, a transaction or a line to open it on mempool.space · Click “view on Arkham” next to an address to open it on Arkham · Click “✎ label” to label an address. Click a label to edit it · Click + above an address to load a maximum of 10 more of its transactions (in and out) · Click a “+ N hidden” tag to show all inputs and outputs of that transaction</span>
-  <span class="intro">Each transaction is a grey square. <b class="i">Pink lines are inputs</b>: an address spends into a transaction. The amount is the value of the coin that the address spends. <b class="o">Grey lines are outputs</b>: a transaction pays an address. The input minus the outputs in the graph is equal to the outputs that TRACEY did not trace, plus the fee. Each square shows its full number of inputs and outputs, and its fee.</span>
+  <span class="intro">Each transaction is a grey square. <b class="o">Grey lines are inputs and outputs.</b> An input goes from an address into a transaction: the address spends. The amount is the value of the coin that the address spends. An output goes from a transaction to an address: the transaction pays the address. The arrow shows the direction. The input minus the outputs in the graph is equal to the outputs that TRACEY did not trace, plus the fee. Each square shows its full number of inputs and outputs, and its fee.</span>
   <div class="legend" id="legend">
     <span><i class="sw" style="background:var(--given);box-shadow:0 0 0 2px var(--panel),0 0 0 3.5px var(--given);margin:0 2px"></i>address / transaction that you supplied</span>
     <span><i class="sw" style="background:#ff00ff;border-radius:2px"></i>attribution</span>
@@ -412,8 +412,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
     <span id="lg-fpo" hidden><i class="sw" style="background:var(--fpo);border-radius:3px"></i>unusual fingerprint of 2 or more wallets</span>
     <span id="lg-peel" hidden><i class="sw" style="background:var(--peel);border-radius:3px"></i>peel chain</span>
     <span id="lg-cj" hidden><i class="sw" style="background:var(--cj);border-radius:3px;width:18px;font:700 8px system-ui;color:#1d1d1b;text-align:center;line-height:10px">cj</i>probable coinjoin (mempool.space heuristic)</span>
-    <span><i class="ln" style="border-color:var(--in)"></i>input (address → tx)</span>
-    <span><i class="ln" style="border-color:var(--out)"></i>output (tx → address)</span>
+    <span><i class="ln" style="border-color:var(--out)"></i>input (address → tx) or output (tx → address)</span>
     <span id="lg-change" hidden><i class="ln" style="border-color:var(--out);border-top-style:dashed"></i>output, probable change</span>
     <span id="lg-own" hidden><i class="sw" style="background:conic-gradient(#c0392b,#2e8b57,#2563eb,#c0392b)"></i>same colour = probably the same wallet (spent together)</span>
   </div>
@@ -1399,7 +1398,7 @@ function renderGraph(keepView){
   const minX = Math.min(...nodes.map(n => G.pos[n.id] + foot(n).L));
 
   const defs = el('defs', {});
-  ['in', 'out'].forEach(k => { const mk = el('marker', {id: 'ar-' + k, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto'}, defs); el('path', {d: 'M0,1 L10,5 L0,9 z', fill: `var(--${k})`}, mk); });
+  ['in', 'out'].forEach(k => { const mk = el('marker', {id: 'ar-' + k, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto'}, defs); el('path', {d: 'M0,1 L10,5 L0,9 z', fill: 'var(--out)'}, mk); });
   order.forEach(r => { const t = el('text', {x: minX - 70, y: rowY[r] + 4, class: 'colh'}); t.textContent = rowLabel(r); });
 
   // privacy numbering: top to bottom, then left to right
