@@ -243,13 +243,18 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
   <h2 id="h-change">Change (“show change”)</h2>
   <p>When a wallet makes a payment, it usually sends the remaining amount back to the sender. This new output is the “change”. If you know which output is the change, you know where the money of the sender went next.</p>
   <h3>Rules</h3>
-  <p>TRACEY examines only transactions with exactly two outputs. The change output is the output that:</p>
-  <ol><li>goes back to one of the input addresses of the transaction. If no output does this:</li>
-  <li>is not a round amount when the other output is a round amount (a multiple of 0.001 BTC).</li></ol>
-  <p>If these rules do not give one clear result, TRACEY does not mark an output. A grey dashed line shows a change output.</p>
+  <p>TRACEY uses the “findNext2” method of Kappos et al. (2022). TRACEY examines transactions with two or more outputs. First, TRACEY finds the wallet of the sender. This wallet contains the input addresses and all addresses that were spent together with them. An output is the change only if all these conditions are true:</p>
+  <ul><li>The output is spent.</li>
+  <li>The address type of the output is also in the wallet of the sender.</li>
+  <li>The transaction that spends the output has the same settings as a transaction of the sender: version, RBF, locktime and SegWit.</li>
+  <li>The inputs of that next transaction were only spent together with each other.</li>
+  <li>If the change of the sender was always at the same position (the first or the last output), the output is at that position.</li></ul>
+  <p>If exactly one output meets all conditions, TRACEY marks it as the change. If no output or more than one output meets them, TRACEY does not mark an output. A grey dashed line shows a change output.</p>
+  <h3>Accuracy</h3>
+  <p>Kappos et al. tested this method on 60 known wallets of services. On average, 0.02 % of the outputs that it marked as change were incorrect. Other published methods had 12.7 % to 64 % incorrect results. These values come from the test of the authors. TRACEY sees only the transactions that it loads, not the full blockchain. Because of this, the accuracy of TRACEY can be different.</p>
   <h3>Limits</h3>
-  <p>These conditions cause incorrect results: PayJoins, and change with a round amount. TRACEY does not use the address type of the outputs to find the change. A payment can have the same address type as the inputs, for example a payment to an exchange. Then that guess is incorrect.</p>
-  <p class="src">Sources: <a href="https://en.bitcoin.it/wiki/Privacy#Change_address_detection" target="_blank" rel="noopener">Bitcoin Wiki: Privacy, change address detection</a> · <a href="https://cseweb.ucsd.edu/~smeiklejohn/files/imc13.pdf" target="_blank" rel="noopener">Meiklejohn et al. (2013): A Fistful of Bitcoins</a> · <a href="https://ishaana.com/blog/wallet_fingerprinting/" target="_blank" rel="noopener">Ishaana Misra (2023): Wallet Fingerprints</a></p>
+  <p>TRACEY cannot find the change if no output is spent. The method frequently gives no result, for example when the payment and the change are spent in the same way. PayJoins and CoinJoins can cause incorrect results. If TRACEY does not mark the change, examine the transaction manually.</p>
+  <p class="src">Sources: <a href="https://www.usenix.org/system/files/sec22-kappos.pdf" target="_blank" rel="noopener">Kappos et al. (2022): How to Peel a Million</a> · <a href="https://en.bitcoin.it/wiki/Privacy#Change_address_detection" target="_blank" rel="noopener">Bitcoin Wiki: Privacy, change address detection</a> · <a href="https://cseweb.ucsd.edu/~smeiklejohn/files/imc13.pdf" target="_blank" rel="noopener">Meiklejohn et al. (2013): A Fistful of Bitcoins</a> · <a href="https://ishaana.com/blog/wallet_fingerprinting/" target="_blank" rel="noopener">Ishaana Misra (2023): Wallet Fingerprints</a></p>
 
   <h2 id="h-own">Common ownership (“show common ownership”)</h2>
   <p>To spend coins, a wallet must sign each input. Thus, the addresses that pay into the same transaction usually belong to one wallet. This is the oldest heuristic in blockchain analysis. Analysts also use it more than all other heuristics.</p>
@@ -372,7 +377,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
       <label title="Safety limit for the size of the graph">max <input type="number" id="s-max" min="10" max="2000" value="250"> addresses</label>
     </div>
     <div class="opts">
-      <span class="opt"><label><input type="checkbox" id="s-change"> show change</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Change</b>TRACEY examines only transactions with exactly 2 outputs. The change output is the output that:<br>1. goes back to an input address. If no output does this:<br>2. is not round when the other output is a round amount.<br>If there is no clear result, TRACEY does not mark an output.<br>A grey dashed line shows a change output.</span></span></span>
+      <span class="opt"><label><input type="checkbox" id="s-change"> show change</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Change</b>TRACEY uses the findNext2 method (Kappos et al. 2022). An output is the change only if it is spent, its address type is in the wallet of the sender, and the next transaction has the same settings as the transactions of the sender. If exactly one output meets these conditions, TRACEY marks it. If not, TRACEY does not mark an output.<br>A grey dashed line shows a change output.</span></span></span>
       <span class="opt"><label><input type="checkbox" id="s-own"> show common ownership</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Common ownership</b>TRACEY counts addresses that pay into the same transaction as one wallet. The links connect: A+B and B+C make one wallet.<br>TRACEY does not use coinjoins (mempool.space rules).<br>Each wallet in the graph that these rules apply to gets a tag and its own colour.</span></span></span>
       <span class="opt"><label><input type="checkbox" id="s-cj"> show coinjoin</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>coinjoin</b>mempool.space rules. All must be true:<br>1. a minimum of 5 inputs and 5 outputs<br>2. different input amounts + different output amounts are a maximum of half of all inputs + outputs<br>3. no output address occurs two times<br>4. no inscription or OP_RETURN<br>5. the ratio of inputs to outputs is between 1:5 and 5:1<br>A yellow cj badge shows a coinjoin.</span></span></span>
       <span class="opt"><label><input type="checkbox" id="s-fp"> show behavioral fingerprint</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Behavioral fingerprint</b>A behavioral fingerprint shows that transactions probably come from the same wallet software or setup. It does not show the same person or the same wallet. Unusual fingerprints with rare custom setups can show the same service. Behavioral heuristics are the least reliable heuristics.<br><br><b>Known wallets</b>All known wallets have one colour. TRACEY removes each wallet whose default settings do not agree with the transaction. It compares the version, locktime, exact nSequence, signatures, order of inputs and outputs, change and address reuse. The list contains Bitcoin Core, Electrum, Sparrow, BlueWallet, Trezor Suite, BitBoxApp and Ledger Live. TRACEY compared each wallet with its current code (Nov 2026). The method comes from the 2023 study by Ishaana Misra. Trezor Suite and BitBoxApp look the same on the blockchain. TRACEY does not show a Wasabi Wallet tag, because Wasabi makes its transactions look like usual network traffic. Coldcard only signs, and it has no fingerprint of its own. If 3 or fewer wallets agree, the tag shows all of them.<br><br><b>Unusual fingerprints</b>These are transactions that do not agree with a known wallet. 2 or more wallets get the same “fingerprint” tag when they have the same traits. The number of these traits must be equal to or more than the setting. There are 9 traits: version 1, locktime 0, RBF off, BIP69 inputs (3+), BIP69 outputs (3+), the same whole-number fee rate, the same multisig or other rare input type, change to the same rare address type (P2WSH, P2SH or P2PKH), and transactions within 6 blocks of each other. TRACEY does not use coinjoins.</span></span><span id="fp-x-wrap" hidden><label>unusual traits ≥ <input type="number" id="s-fpx" min="1" max="9" value="9"> /9</label></span></span>
@@ -535,7 +540,7 @@ $('s-fp').addEventListener('change', () => { $('fp-x-wrap').hidden = !$('s-fp').
 $('s-fpx').addEventListener('input', () => { saveState(); if (G) render(true); });
 $('s-peel').addEventListener('change', () => { $('peel-x-wrap').hidden = !$('s-peel').checked; });
 $('s-peelx').addEventListener('input', () => { saveState(); if (G) render(true); });
-['s-change', 's-own', 's-cj', 's-fp', 's-peel'].forEach(id => $(id).addEventListener('change', () => { saveState(); if (G) render(true); }));
+['s-change', 's-own', 's-cj', 's-fp', 's-peel'].forEach(id => $(id).addEventListener('change', () => { saveState(); if (G) render(true); if ((id === 's-change' || id === 's-peel') && $(id).checked) loadChange(); }));
 // labels added in the graph: only ever saved in this browser, never written into the input table
 let graphLabels = {};
 try { graphLabels = JSON.parse(localStorage.getItem(STORE + ':graphLabels') || '{}') || {}; } catch(e) {}
@@ -584,7 +589,8 @@ function freshCache(){
     else if (/^\/tx\/[0-9a-f]{64}$/.test(path)) { if (!(j && j.status && j.status.confirmed)) cache.delete(path); }
   }
   for (const id in PREV_H) if (PREV_H[id] < 0) delete PREV_H[id];
-  for (const id in FP) delete FP[id];   // wallet results can depend on those heights; they are rebuilt without any request
+  for (const id in FP) delete FP[id];
+  for (const o of [CHG, CL, KTX, ADDRTX]) for (const k in o) delete o[k];   // wallet results can depend on those heights; they are rebuilt without any request
 }
 async function addressTxs(a, chainCount){
   const first = await get(`/address/${a}/txs`);
@@ -817,22 +823,111 @@ async function fetchPrevHeights(txs){
   } finally { fpFetching = false; }
   if (G) render(true);
 }
-function changeOf(tx){
-  if (!tx) return null;
-  if (tx.txid in CHG) return CHG[tx.txid];
-  const res = (() => {
-    const outs = tx.vout.filter(o => o.scriptpubkey_address);
-    if (outs.length !== 2) return null;
-    const ins = inAddrs(tx);
-    const back = outs.filter(o => ins.includes(o.scriptpubkey_address));
-    if (back.length === 1) return {addr: back[0].scriptpubkey_address, why: 'probable change: goes back to an input address'};
-    if (back.length) return null;
-    // no address-type rule: a payment (e.g. to an exchange) can have the same type as the inputs, so it gave wrong change
-    const round = outs.filter(o => o.value % 100000 === 0);
-    if (round.length === 1) { const o = outs.find(x => x !== round[0]); return {addr: o.scriptpubkey_address, why: 'probable change: the other output is a round amount'}; }
-    return null;
-  })();
-  return CHG[tx.txid] = res;
+// change = the result of findNext2 (Kappos et al. 2022, "How to Peel a Million", sections 4.1, 5.2 and 7.2),
+// computed by loadChange() while "show change" or "show peelchains" is on. No result: no change is marked.
+function changeOf(tx){ return (tx && CHG[tx.txid]) || null; }
+
+/* ---------------- change: findNext2 ---------------- */
+// KTX: every transaction TRACEY loaded for this; ADDRTX: address -> txids that use it; CL: txid -> sender cluster
+const KTX = {}, ADDRTX = {}, CL = {};
+function indexTx(t){
+  if (!t || !t.txid || KTX[t.txid]) return;
+  KTX[t.txid] = t;
+  t.vin.forEach(v => { const a = v.prevout && v.prevout.scriptpubkey_address; if (a) (ADDRTX[a] ||= new Set()).add(t.txid); });
+  t.vout.forEach(o => { if (o.scriptpubkey_address) (ADDRTX[o.scriptpubkey_address] ||= new Set()).add(t.txid); });
+}
+async function loadAddrTxs(a){ (await get(`/address/${a}/txs`)).forEach(indexTx); }
+// transaction features (4.1.1): version, replace-by-fee, locktime set, SegWit
+const txFeat = t => [t.version, t.vin.some(v => v.sequence < 0xffffffff), t.locktime > 0, t.vin.some(v => v.witness && v.witness.length)].join('|');
+// address feature (4.1.2): the address type
+function addrTypeOf(a){
+  for (const id of ADDRTX[a] || []) { const t = KTX[id];
+    const o = t.vout.find(x => x.scriptpubkey_address === a); if (o) return o.scriptpubkey_type;
+    const v = t.vin.find(x => x.prevout && x.prevout.scriptpubkey_address === a); if (v) return v.prevout.scriptpubkey_type; }
+  return null;
+}
+// co-spend cluster over the loaded transactions
+function cospend(seed){
+  const C = new Set(seed); let grew = true;
+  while (grew) { grew = false;
+    for (const a of [...C]) for (const id of ADDRTX[a] || []) { const i = inAddrs(KTX[id]); if (i.includes(a)) i.forEach(b => { if (!C.has(b)) { C.add(b); grew = true; } }); } }
+  return C;
+}
+// findNext2 for one transaction: {res: {addr, vout, why} or null, C: sender cluster}
+async function findNext2(t){
+  indexTx(t);
+  const outs = t.vout.map((o, i) => ({o, i})).filter(x => x.o.scriptpubkey_address);
+  if (outs.length < 2) return {res: null};
+  const ins = inAddrs(t);
+  for (const a of ins) await loadAddrTxs(a);
+  // the sender cluster C: co-spend of the inputs, plus the cluster of an earlier transaction whose change this transaction spends
+  let C = cospend(ins);
+  t.vin.forEach(v => { const p = CHG[v.txid]; if (p && p.vout === v.vout && CL[v.txid]) CL[v.txid].forEach(a => C.add(a)); });
+  C = cospend(C);
+  // cluster features (4.1.3): TF_C, AF_C and the change strategy change_C
+  const Ctx = new Set(); C.forEach(a => (ADDRTX[a] || []).forEach(id => { if (inAddrs(KTX[id]).some(x => C.has(x))) Ctx.add(id); }));
+  const TF = new Set([...Ctx].map(id => txFeat(KTX[id]))), AF = new Set([...C].map(addrTypeOf).filter(Boolean));
+  const pos = new Set(); let seen = 0;
+  for (const id of Ctx) {
+    const x = KTX[id], own = x.vout.map((o, i) => C.has(o.scriptpubkey_address) ? i : -1).filter(i => i >= 0);
+    if (own.length !== 1) continue;
+    seen++; const i = own[0], l = x.vout.length - 1;
+    pos.add(i === 0 && i === l ? 'both' : i === 0 ? 'first' : i === l ? 'last' : 'other');
+  }
+  let strat = null; // null = any output (change_C = None)
+  if (seen && !pos.has('other')) strat = [...pos].every(p => p === 'last' || p === 'both') ? 'last' : [...pos].every(p => p === 'first' || p === 'both') ? 'first' : 'ends';
+  const last = t.vout.length - 1;
+  const cand = outs.filter(x => !strat || (strat === 'last' ? x.i === last : strat === 'first' ? x.i === 0 : x.i === 0 || x.i === last));
+  // Algorithm 1 (findNext) with the findNext2 condition (7.2): exactly one candidate must pass every check
+  const sp = await get(`/tx/${t.txid}/outspends`), hits = [];
+  for (const {o, i} of cand) {
+    const s = sp[i];
+    if (!s || !s.spent || !s.txid) continue;                       // 1. the output is spent
+    if (!AF.has(o.scriptpubkey_type)) continue;                     // 2. its address type is in the cluster
+    const n = await get(`/tx/${s.txid}`); indexTx(n);
+    if (!TF.has(txFeat(n))) continue;                               // 3. the next transaction has features of the cluster
+    // findNext2: the inputs of the next transaction were only ever spent together with each other
+    const I = inAddrs(n); let only = true;
+    for (const a of I) {
+      // all transactions of the address must be loaded, otherwise TRACEY cannot check this (no result)
+      const info = await get(`/address/${a}`); await loadAddrTxs(a);
+      if ((ADDRTX[a] || new Set()).size < info.chain_stats.tx_count + info.mempool_stats.tx_count) { only = false; break; }
+    }
+    if (only && cospend(I).size !== I.length) only = false;
+    if (only) hits.push({o, i});
+  }
+  if (hits.length !== 1) return {res: null, C};
+  const h = hits[0];
+  return {res: {addr: h.o.scriptpubkey_address, vout: h.i, why: 'probable change (findNext2): spent in a transaction with the same settings as the transactions of the sender'}, C};
+}
+// run findNext2 on every drawn transaction that has no result yet, earlier transactions first, then redraw.
+// Only while "show change" or "show peelchains" is on. inJob: called inside a trace or expansion that is already a job.
+async function loadChange(inJob){
+  if (!G || !($('s-change').checked || $('s-peel').checked)) return;
+  if (!inJob && busy) return;
+  const endJob = inJob ? null : startJob();
+  const todo = Object.keys(G.txinfo).filter(id => RAW[id] && !(id in CHG));
+  // order: a transaction after the drawn transactions that created its inputs (a chain is followed hop by hop)
+  const left = new Set(todo), order = [];
+  while (left.size) {
+    const ready = [...left].filter(id => !RAW[id].vin.some(v => left.has(v.txid)));
+    const pick = ready.length ? ready : [...left];
+    pick.sort((a, b) => (G.txinfo[a].block || Infinity) - (G.txinfo[b].block || Infinity));
+    const id = pick[0]; order.push(id); left.delete(id);
+  }
+  let k = 0;
+  try {
+    for (const id of order) {
+      setStatus(`TRACEY checks the change: transaction ${++k} of ${order.length}, ${nReq} requests to mempool.space`);
+      const r = await findNext2(RAW[id]);
+      CHG[id] = r.res;
+      if (r.res) CL[id] = new Set([...r.C, r.res.addr]);
+    }
+    setStatus('');
+  } catch (e) {
+    if (e.message !== 'stopped') setStatus('TRACEY could not check all change outputs: ' + e.message, true);
+  }
+  if (endJob) { endJob(); if (G) render(true); }
 }
 const inValue = (tx, a) => tx.vin.filter(v => v.prevout && v.prevout.scriptpubkey_address === a).reduce((s, v) => s + v.prevout.value, 0);
 
@@ -961,6 +1056,7 @@ async function expandNode(a){
       delete n.stopWhy; n.expanded = true; n.backDone = true; G.done[a] = Math.max(G.done[a] ?? 0, 1);
     }
   } catch (e) { failed = e; }
+  if (!failed) { try { await loadChange(true); } catch (e) {} }
   endJob();
   // TRACE was clicked while this loaded: the new trace replaces the graph, so draw nothing here
   if (failed && failed.message === 'stopped') return;
@@ -1025,6 +1121,7 @@ async function runTrace(){
       }
     }
   } catch (e) { failed = e; }
+  if (!failed && my === traceRun) { try { await loadChange(true); } catch (e) {} }
   endJob();
   // a newer TRACE click stopped this trace: that trace draws the graph and shows the result
   if (my !== traceRun) return;
@@ -1193,6 +1290,7 @@ function expandTx(txid){
   render(true);
   const p1 = lastPos[tn.id]; if (p0 && p1) { tx = sx - p1.x * s; ty = sy - p1.y * s; apply(); }
   setResult(`Expanded tx ${txid.slice(0, 8)}…: ${rtx.vin.length} inputs, ${rtx.vout.length} outputs. Press “← back” to undo.`);
+  loadChange();
 }
 const undoStack = [];
 function snapshot(){
