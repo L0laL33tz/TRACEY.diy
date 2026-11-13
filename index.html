@@ -245,11 +245,10 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
   <h3>Rules</h3>
   <p>TRACEY examines only transactions with exactly two outputs. The change output is the output that:</p>
   <ol><li>goes back to one of the input addresses of the transaction. If no output does this:</li>
-  <li>is the only output with the same address type as the inputs. All inputs must have one type, and the other output must have a different type. If no output does this:</li>
   <li>is not a round amount when the other output is a round amount (a multiple of 0.001 BTC).</li></ol>
   <p>If these rules do not give one clear result, TRACEY does not mark an output. A grey dashed line shows a change output.</p>
   <h3>Limits</h3>
-  <p>These conditions cause incorrect results: wallets that send change to the same address type as the payment, PayJoins, and change with a round amount. Many new wallets make the change type the same as the payment type. They do this to prevent this guess.</p>
+  <p>These conditions cause incorrect results: PayJoins, and change with a round amount. TRACEY does not use the address type of the outputs to find the change. A payment can have the same address type as the inputs, for example a payment to an exchange. Then that guess is incorrect.</p>
   <p class="src">Sources: <a href="https://en.bitcoin.it/wiki/Privacy#Change_address_detection" target="_blank" rel="noopener">Bitcoin Wiki: Privacy, change address detection</a> · <a href="https://cseweb.ucsd.edu/~smeiklejohn/files/imc13.pdf" target="_blank" rel="noopener">Meiklejohn et al. (2013): A Fistful of Bitcoins</a> · <a href="https://ishaana.com/blog/wallet_fingerprinting/" target="_blank" rel="noopener">Ishaana Misra (2023): Wallet Fingerprints</a></p>
 
   <h2 id="h-own">Common ownership (“show common ownership”)</h2>
@@ -373,7 +372,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
       <label title="Safety limit for the size of the graph">max <input type="number" id="s-max" min="10" max="2000" value="250"> addresses</label>
     </div>
     <div class="opts">
-      <span class="opt"><label><input type="checkbox" id="s-change"> show change</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Change</b>TRACEY examines only transactions with exactly 2 outputs. The change output is the output that:<br>1. goes back to an input address. If no output does this:<br>2. is the only output with the same address type as the inputs. If no output does this:<br>3. is not round when the other output is a round amount.<br>If there is no clear result, TRACEY does not mark an output.<br>A grey dashed line shows a change output.</span></span></span>
+      <span class="opt"><label><input type="checkbox" id="s-change"> show change</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Change</b>TRACEY examines only transactions with exactly 2 outputs. The change output is the output that:<br>1. goes back to an input address. If no output does this:<br>2. is not round when the other output is a round amount.<br>If there is no clear result, TRACEY does not mark an output.<br>A grey dashed line shows a change output.</span></span></span>
       <span class="opt"><label><input type="checkbox" id="s-own"> show common ownership</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Common ownership</b>TRACEY counts addresses that pay into the same transaction as one wallet. The links connect: A+B and B+C make one wallet.<br>TRACEY does not use coinjoins (mempool.space rules).<br>Each wallet in the graph that these rules apply to gets a tag and its own colour.</span></span></span>
       <span class="opt"><label><input type="checkbox" id="s-cj"> show coinjoin</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>coinjoin</b>mempool.space rules. All must be true:<br>1. a minimum of 5 inputs and 5 outputs<br>2. different input amounts + different output amounts are a maximum of half of all inputs + outputs<br>3. no output address occurs two times<br>4. no inscription or OP_RETURN<br>5. the ratio of inputs to outputs is between 1:5 and 5:1<br>A yellow cj badge shows a coinjoin.</span></span></span>
       <span class="opt"><label><input type="checkbox" id="s-fp"> show behavioral fingerprint</label><span class="info" tabindex="0" aria-label="rules">i<span class="tipbox"><b>Behavioral fingerprint</b>A behavioral fingerprint shows that transactions probably come from the same wallet software or setup. It does not show the same person or the same wallet. Unusual fingerprints with rare custom setups can show the same service. Behavioral heuristics are the least reliable heuristics.<br><br><b>Known wallets</b>All known wallets have one colour. TRACEY removes each wallet whose default settings do not agree with the transaction. It compares the version, locktime, exact nSequence, signatures, order of inputs and outputs, change and address reuse. The list contains Bitcoin Core, Electrum, Sparrow, BlueWallet, Trezor Suite, BitBoxApp and Ledger Live. TRACEY compared each wallet with its current code (Nov 2026). The method comes from the 2023 study by Ishaana Misra. Trezor Suite and BitBoxApp look the same on the blockchain. TRACEY does not show a Wasabi Wallet tag, because Wasabi makes its transactions look like usual network traffic. Coldcard only signs, and it has no fingerprint of its own. If 3 or fewer wallets agree, the tag shows all of them.<br><br><b>Unusual fingerprints</b>These are transactions that do not agree with a known wallet. 2 or more wallets get the same “fingerprint” tag when they have the same traits. The number of these traits must be equal to or more than the setting. There are 9 traits: version 1, locktime 0, RBF off, BIP69 inputs (3+), BIP69 outputs (3+), the same whole-number fee rate, the same multisig or other rare input type, change to the same rare address type (P2WSH, P2SH or P2PKH), and transactions within 6 blocks of each other. TRACEY does not use coinjoins.</span></span><span id="fp-x-wrap" hidden><label>unusual traits ≥ <input type="number" id="s-fpx" min="1" max="9" value="9"> /9</label></span></span>
@@ -824,12 +823,11 @@ function changeOf(tx){
   const res = (() => {
     const outs = tx.vout.filter(o => o.scriptpubkey_address);
     if (outs.length !== 2) return null;
-    const ins = inAddrs(tx), inTypes = new Set(tx.vin.map(v => v.prevout && v.prevout.scriptpubkey_type).filter(Boolean));
+    const ins = inAddrs(tx);
     const back = outs.filter(o => ins.includes(o.scriptpubkey_address));
     if (back.length === 1) return {addr: back[0].scriptpubkey_address, why: 'probable change: goes back to an input address'};
     if (back.length) return null;
-    const same = outs.filter(o => inTypes.size === 1 && inTypes.has(o.scriptpubkey_type));
-    if (same.length === 1) return {addr: same[0].scriptpubkey_address, why: 'probable change: same address type as the inputs. The other output has a different type'};
+    // no address-type rule: a payment (e.g. to an exchange) can have the same type as the inputs, so it gave wrong change
     const round = outs.filter(o => o.value % 100000 === 0);
     if (round.length === 1) { const o = outs.find(x => x !== round[0]); return {addr: o.scriptpubkey_address, why: 'probable change: the other output is a round amount'}; }
     return null;
@@ -1010,8 +1008,13 @@ async function runTrace(){
   // the view is fitted to the graph only on the first draw; after that it stays where the user put it
   let lastDraw = Date.now(), failed = null, fitted = false;
   const draw = () => { render(fitted); fitted = true; };
+  // 2 or more addresses: connect mode finds only the paths between them (transaction IDs are traced as usual)
+  const cAddrs = [...new Set(starts.filter(r => !TXID_RE.test(r.addr)).map(r => r.addr))];
+  const connect = cAddrs.length > 1;
   try {
+    if (connect) await connectTrace(cAddrs);
     for (const r of starts) {
+      if (connect && !TXID_RE.test(r.addr)) continue;
       if (TXID_RE.test(r.addr)) await startTx(r.addr, S.hops);
       else { addrNode(r.addr, 0); queue.push({a: r.addr, budget: S.hops}); }
       while (queue.length) {
@@ -1032,7 +1035,118 @@ async function runTrace(){
   try { updateBack(); } catch (e) {}
   const summary = `${nAddr()} addresses, ${Object.keys(G.txinfo).length} transactions, ${nReq} requests to mempool.space`;
   if (failed) setResult((failed.message === 'stopped' ? 'Stopped. ' : failed.message + '. ') + 'The graph shows the results until now: ' + summary, failed.message !== 'stopped');
+  else if (G.connect) setResult(connectResult(summary));
   else setResult('Done: ' + summary + (G.capped ? ` (TRACEY reached the limit of ${S.max} addresses. Increase "max addresses" to go farther)` : ''));
+}
+function connectResult(summary){
+  const c = G.connect;
+  if (c.paths) return `Done (connect mode): ${c.paths} path${c.paths === 1 ? '' : 's'} between your addresses. ${summary}` + (c.capped ? `. TRACEY reached the limit of ${S.max} addresses. Increase "max addresses" to find more paths.` : '');
+  if (c.capped) return `Connect mode: TRACEY found no path between your addresses before the limit of ${S.max} addresses. Increase "max addresses" to look farther.`;
+  return 'Connect mode: TRACEY found no path between your addresses. Large transactions, addresses with many transactions and dust outputs stop the search.';
+}
+
+/* ---------------- connect mode (2 or more addresses) ---------------- */
+// From each address you supplied, TRACEY goes forward (where the money went) and back (who paid it), one hop at a
+// time for all searches together. There is no hop limit. A path is where the forward search of one address meets the
+// back search of another. The search does not follow: addresses with more than S.cutoff transactions (an address you
+// supplied with more goes only one hop back), transactions with more than S.batch inputs or outputs (except at your
+// addresses), outputs below S.dust. It stops after S.max addresses. Only the paths and the outputs of their
+// transactions are drawn; everything else stays under + and "N hidden".
+const BIG_GIVEN_TX = 250; // an address you supplied with many transactions: only its newest 250 are checked for the hop back
+async function connectTrace(addrs){
+  const CTX = {}, checked = new Set(), searches = [];
+  let capped = false;
+  const count = info => info.chain_stats.tx_count + info.mempool_stats.tx_count;
+  for (const g of addrs) {
+    const big = count(await get(`/address/${g}`)) > S.cutoff;
+    // probable exchange / service you supplied: no forward search, one hop back
+    searches.push({g, dir: 'f', par: {['a:' + g]: null}, front: big ? [] : [g]});
+    searches.push({g, dir: 'b', par: {['a:' + g]: null}, front: [g], maxHop: big ? 1 : Infinity});
+  }
+  for (let hop = 0; !capped && searches.some(s => s.front.length); hop++) {
+    for (const s of searches) {
+      if (capped) break;
+      if (hop >= s.maxHop) s.front = [];
+      if (!s.front.length) continue;
+      const nx = [];
+      for (const a of s.front) {
+        const info = await get(`/address/${a}`);
+        if (count(info) > S.cutoff && a !== s.g) continue;
+        if (!checked.has(a) && checked.size >= S.max) { capped = true; break; }
+        checked.add(a);
+        const txs = await addressTxs(a, Math.min(info.chain_stats.tx_count, a === s.g ? BIG_GIVEN_TX : Infinity));
+        for (const t of txs) {
+          const spends = inValue(t, a) > 0;
+          if (s.dir === 'f' ? !spends : spends) continue;
+          const tid = 't:' + t.txid;
+          if (tid in s.par) continue;
+          s.par[tid] = 'a:' + a; CTX[t.txid] = t;
+          const ins = inAddrs(t);
+          if (a !== s.g && (t.vout.length > S.batch || ins.length > S.batch)) continue;
+          const next = s.dir === 'f' ? t.vout.filter(o => o.scriptpubkey_address && o.value >= S.dust).map(o => o.scriptpubkey_address) : ins;
+          for (const b of next) if (!(('a:' + b) in s.par)) { s.par['a:' + b] = tid; nx.push(b); }
+        }
+        setStatus(`Connect mode: TRACEY looks for paths between your addresses. ${checked.size} addresses checked, ${nReq} requests to mempool.space`);
+      }
+      s.front = nx;
+    }
+  }
+  // paths: the forward search of one address meets the back search of another. Only the first contact on each path counts.
+  const paths = [];
+  for (const f of searches) if (f.dir === 'f') for (const b of searches) {
+    if (b.dir !== 'b' || b.g === f.g) continue;
+    const meet = new Set(Object.keys(f.par).filter(id => id in b.par));
+    for (const m of meet) {
+      if (meet.has(f.par[m])) continue;
+      const p = [];
+      for (let id = m; id; id = f.par[id]) p.unshift(id);
+      for (let id = b.par[m]; id; id = b.par[id]) p.push(id);
+      paths.push(p);
+    }
+  }
+  // rows: the longest distance from the start of any path, so a transaction where paths meet sits below all of them
+  const preds = {};
+  paths.forEach(p => p.forEach((id, i) => { (preds[id] ||= new Set()); if (i) preds[id].add(p[i - 1]); }));
+  const rowOf = {}, open = new Set();
+  const row = id => {
+    if (id in rowOf) return rowOf[id];
+    if (open.has(id)) return 0;
+    open.add(id); let r = 0; preds[id].forEach(p => { r = Math.max(r, row(p) + 1); }); open.delete(id);
+    return rowOf[id] = r;
+  };
+  const ids = Object.keys(preds).sort((x, y) => row(x) - row(y));
+  ids.forEach(id => { if (id.startsWith('a:')) addrNode(id.slice(2), row(id)); else txNode(CTX[id.slice(2)], row(id)); });
+  paths.forEach(p => p.forEach((id, i) => {
+    const nxt = p[i + 1]; if (!nxt) return;
+    if (id.startsWith('a:')) { const t = CTX[nxt.slice(2)], a = id.slice(2); addEdge(a, 'tx:' + t.txid, 'in', inValue(t, a), t); }
+    else { const t = CTX[id.slice(2)]; addEdge('tx:' + t.txid, nxt.slice(2), 'out', 0, t); }
+  }));
+  // the outputs of each transaction on a path, so you see where the payments went
+  const labels = labelMap();
+  ids.filter(id => id.startsWith('t:')).forEach(id => {
+    const t = CTX[id.slice(2)], tn = G.nodes['tx:' + t.txid];
+    t.vin.forEach(v => { const a = v.prevout && v.prevout.scriptpubkey_address; if (a && G.nodes[a]) G.nodes[a].type = G.nodes[a].type || v.prevout.scriptpubkey_type; });
+    const outs = t.vout.filter(o => o.scriptpubkey_address);
+    if (outs.length > S.batch) tn.batch = true;
+    outs.forEach(o => {
+      const b = o.scriptpubkey_address;
+      if (tn.batch && !G.nodes[b] && !G.given[b] && !labels[b]) return;
+      const fresh = !G.nodes[b], bn = addrNode(b, tn.row + 1);
+      bn.type = bn.type || o.scriptpubkey_type;
+      addEdge(tn.id, b, 'out', o.value, t);
+      if (fresh) bn.stopWhy = o.value < S.dust ? `below ${S.dust} sats — not followed` : 'not on a path between your addresses. Click + to load its transactions';
+    });
+  });
+  for (const id of ids) if (id.startsWith('a:')) {
+    const n = G.nodes[id.slice(2)]; n.expanded = true; delete n.stopWhy;
+    n.tx_count = count(await get(`/address/${n.addr}`));
+  }
+  for (const g of addrs) if (!G.nodes[g]) {
+    const n = addrNode(g, 0); n.tx_count = count(await get(`/address/${g}`));
+    n.stopWhy = 'connect mode: TRACEY found no path from or to this address';
+  }
+  G.capped = capped;
+  G.connect = {paths: paths.length, capped};
 }
 $('traceBtn').addEventListener('click', runTrace);
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.closest && ev.target.closest('#panel') && ev.target.tagName === 'INPUT') runTrace(); });
@@ -1080,7 +1194,7 @@ function expandTx(txid){
 const undoStack = [];
 function snapshot(){
   if (!G) return null;
-  return JSON.stringify({nodes: G.nodes, edges: G.edges, done: G.done, given: G.given, txinfo: G.txinfo, pos: G.pos, pulled: G.pulled, capped: G.capped, S});
+  return JSON.stringify({nodes: G.nodes, edges: G.edges, done: G.done, given: G.given, txinfo: G.txinfo, pos: G.pos, pulled: G.pulled, capped: G.capped, connect: G.connect, S});
 }
 // "forward" redoes the steps you went back from. A new trace or expansion starts a new path, so it clears them.
 const redoStack = [];
@@ -1105,7 +1219,7 @@ function restore(st){
     setStatus('Went back: graph cleared.'); return;
   }
   const o = JSON.parse(st);
-  S = o.S; G = {nodes: o.nodes, edges: o.edges, done: o.done, given: o.given, txinfo: o.txinfo, pos: o.pos || {}, pulled: o.pulled, capped: o.capped, ekeys: {}};
+  S = o.S; G = {nodes: o.nodes, edges: o.edges, done: o.done, given: o.given, txinfo: o.txinfo, pos: o.pos || {}, pulled: o.pulled, capped: o.capped, connect: o.connect, ekeys: {}};
   G.edges.forEach(e => G.ekeys[e.from + '|' + e.to + '|' + e.txid] = e);
   $('empty').style.display = 'none';
   render(true);
@@ -1200,7 +1314,7 @@ function renderGraph(keepView){
   const meta = $('meta'); meta.textContent = '';
   const metaAddr = document.createElement('span'); metaAddr.textContent = starts.length > 1 ? starts.length + ' addresses provided' : starts[0];
   $('summary').hidden = false;
-  meta.append('Start: ', metaAddr, ` · ${nodes.filter(n => !n.isTx).length} addresses · ${Object.keys(G.txinfo).length} transactions · data from mempool.space, pulled ${G.pulled} · ${S.hops} hops, stop at >${S.cutoff} tx, exchange / service when paying >${S.svc} outputs of 2+ address types`);
+  meta.append('Start: ', metaAddr, ` · ${nodes.filter(n => !n.isTx).length} addresses · ${Object.keys(G.txinfo).length} transactions · data from mempool.space, pulled ${G.pulled} · ${G.connect ? 'connect mode' : S.hops + ' hops'}, stop at >${S.cutoff} tx, exchange / service when paying >${S.svc} outputs of 2+ address types`);
 
   // layered top-down layout: one row per hop (addresses) and one between each (transactions)
   // Stable layout: every node keeps the x it got when it first appeared (G.pos); new nodes go into their
