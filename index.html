@@ -1104,16 +1104,19 @@ async function connectTrace(addrs){
       paths.push(p);
     }
   }
-  // rows: the longest distance from the start of any path, so a transaction where paths meet sits below all of them
-  const preds = {};
-  paths.forEach(p => p.forEach((id, i) => { (preds[id] ||= new Set()); if (i) preds[id].add(p[i - 1]); }));
-  const rowOf = {}, open = new Set();
-  const row = id => {
-    if (id in rowOf) return rowOf[id];
-    if (open.has(id)) return 0;
-    open.add(id); let r = 0; preds[id].forEach(p => { r = Math.max(r, row(p) + 1); }); open.delete(id);
-    return rowOf[id] = r;
-  };
+  // rows: the shortest route on chain from the start (addresses with nothing before them on a path are hop 0),
+  // the same as in a normal trace
+  const preds = {}, succ = {};
+  paths.forEach(p => p.forEach((id, i) => { (preds[id] ||= new Set()); if (i) { preds[id].add(p[i - 1]); (succ[p[i - 1]] ||= new Set()).add(id); } }));
+  const rowOf = {};
+  let level = Object.keys(preds).filter(id => !preds[id].size);
+  level.forEach(id => rowOf[id] = 0);
+  while (level.length) {
+    const nxt = [];
+    level.forEach(u => (succ[u] || []).forEach(v => { if (!(v in rowOf)) { rowOf[v] = rowOf[u] + 1; nxt.push(v); } }));
+    level = nxt;
+  }
+  const row = id => rowOf[id] ?? 0;
   const ids = Object.keys(preds).sort((x, y) => row(x) - row(y));
   ids.forEach(id => { if (id.startsWith('a:')) addrNode(id.slice(2), row(id)); else txNode(CTX[id.slice(2)], row(id)); });
   paths.forEach(p => p.forEach((id, i) => {
