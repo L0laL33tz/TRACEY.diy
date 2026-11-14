@@ -96,7 +96,12 @@ input[type=text]:focus,input[type=number]:focus{outline:2px solid var(--accent);
 #traceBtn{background:var(--accent);color:#000;font-weight:800;border:0;padding:8px 26px;letter-spacing:.1em;font-size:14px}
 #status{font-size:12px;color:var(--muted);flex-basis:100%}
 /* shown under TRACE while a trace loads: magenta text and a spinning wheel */
-#loading{flex-basis:100%;display:flex;justify-content:center;align-items:center;gap:8px;color:var(--accent);font-weight:700;font-size:13px}
+/* pinned to the top left of the graph: "Trace loading" and, under it in grey, the status of the trace */
+#gmsg{position:absolute;top:10px;left:16px;z-index:3;pointer-events:none;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+#gstatus{font-size:12px;color:var(--muted);background:var(--graph);padding:2px 4px}
+#gstatus:empty{display:none}
+#gstatus.err{color:var(--bad)}
+#loading{background:var(--graph);padding:2px 4px;display:flex;align-items:center;gap:8px;color:var(--accent);font-weight:700;font-size:13px}
 #loading[hidden]{display:none}
 #loading .spin{width:14px;height:14px;border:2.5px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -169,7 +174,7 @@ svg{width:100%;height:100%;display:block}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body{min-height:0}
   header{padding:6px 16px;position:static}
-  #panel,.controls,#tip,#privnote,#zoom,#empty,.xtag,.ark,#lbled{display:none !important}
+  #panel,.controls,#tip,#privnote,#gmsg,#zoom,#empty,.xtag,.ark,#lbled{display:none !important}
   main{height:6.6in;min-height:0;border-bottom:0}
   #result{display:none !important} /* the result line can name an address or txid */
 }
@@ -402,7 +407,6 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
       <a class="hlink" href="#heuristics" target="_blank" rel="noopener">learn more about heuristics</a>
     </div>
     <div class="go"><button id="traceBtn">TRACE</button></div>
-    <div id="loading" role="status" hidden><span class="spin" aria-hidden="true"></span>Trace loading, fetching transactions</div>
     <span id="status"></span>
   </div>
   <p class="hint" id="hint">Type Bitcoin addresses or transaction IDs. You can also type labels. TRACEY traces each address in the list. For a transaction ID, TRACEY shows the addresses that paid into it and the sources of those coins (one hop back). It also traces each output forward. You can paste a list with one address on each line. After an address, you can add a comma and a label.</p>
@@ -415,6 +419,7 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
     <div id="empty">Type addresses above and click TRACE.</div>
     <div id="tip"></div>
     <div id="privnote" hidden>privacy mode, links inactive</div>
+    <div id="gmsg"><div id="loading" role="status" hidden><span class="spin" aria-hidden="true"></span>Trace loading, fetching transactions</div><div id="gstatus"></div></div>
     <div id="lbled"><div class="who" id="le-who"></div><label>Label <input type="text" id="le-l" autocomplete="off" placeholder="e.g. ATTACKER"></label><label>Source <input type="text" id="le-s" autocomplete="off" placeholder="e.g. Arkham, Court Records"></label><div class="btns"><button id="le-del">remove</button><button id="le-x">cancel</button><button id="le-save">save</button></div></div>
   </div>
 </main>
@@ -1099,7 +1104,12 @@ function fundTx(tx, a){
   });
 }
 
-function setStatus(msg, err){ const s = $('status'); s.textContent = msg; s.classList.toggle('err', !!err); }
+// the status shows in the graph when the graph is open, and under TRACE on the start screen
+function setStatus(msg, err){
+  const g = !document.body.classList.contains('home');
+  const s = $(g ? 'gstatus' : 'status'), o = $(g ? 'status' : 'gstatus');
+  s.textContent = msg; s.classList.toggle('err', !!err); o.textContent = ''; o.classList.remove('err');
+}
 // outcome of a trace, expansion or undo: shown under the graph, after the legend, not in the input box
 function setResult(msg, err){ const r = $('result'); if (msg && renderErr) { msg += ' · drawing error: ' + renderErr; err = true; } r.textContent = msg; r.hidden = !msg; r.classList.toggle('err', !!err); setStatus(''); }
 function progress(){ setStatus(`Trace in progress: ${nAddr()} addresses, ${Object.keys(G.txinfo).length} transactions, ${nReq} requests to mempool.space`); }
