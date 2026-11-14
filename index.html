@@ -45,6 +45,11 @@ h1{font-size:18px;margin:0;letter-spacing:.08em;line-height:0}
 .sub{color:var(--muted);font-size:12px}
 footer{position:sticky;bottom:0;z-index:3;padding:8px 16px 10px;background:var(--panel);border-top:1px solid var(--line);display:flex;flex-direction:column;gap:4px;box-shadow:0 -2px 8px rgba(0,0,0,.08)}
 footer .intro{flex-basis:auto}
+/* legend bar: closed, it is 0.5 cm high and shows only the open button; the PDF always shows all of it */
+#ftog{align-self:flex-start;background:none;border:0;padding:0;font-size:12px;line-height:14px;color:var(--muted)}
+#ftog:hover{color:var(--ink)}
+@media screen{ footer.mini{height:0.5cm;box-sizing:border-box;padding:2px 16px;gap:0;overflow:visible} footer.mini > *:not(#zoom):not(#ftog){display:none} }
+@media print{ #ftog{display:none} }
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .sw{width:11px;height:11px;border-radius:50%;display:inline-block}
@@ -413,7 +418,8 @@ body.home #panel{border:1px solid var(--line);border-radius:10px;max-width:1290p
     <div id="lbled"><div class="who" id="le-who"></div><label>Label <input type="text" id="le-l" autocomplete="off" placeholder="e.g. ATTACKER"></label><label>Source <input type="text" id="le-s" autocomplete="off" placeholder="e.g. Arkham, Court Records"></label><div class="btns"><button id="le-del">remove</button><button id="le-x">cancel</button><button id="le-save">save</button></div></div>
   </div>
 </main>
-<footer id="foot">
+<footer id="foot" class="mini">
+  <button id="ftog">show legend ▼</button>
   <!-- zoom / back / reset float just above the footer, so they stay pinned with it while the page scrolls -->
   <div class="controls" id="zoom"><button id="back" disabled title="Undo the last expansion or TRACE">← back</button><button id="fwd" disabled title="Redo the step you went back from">forward →</button><button id="zin">+</button><button id="zout">−</button><button id="zreset">reset</button></div>
   <span class="sub">Click an address, a transaction or a line to open it on mempool.space · Click “view on Arkham” next to an address to open it on Arkham · Click “✎ label” to label an address. Click a label to edit it · Click + above an address to load a maximum of 10 more of its transactions (in and out) · Click a “+ N hidden” tag to show all inputs and outputs of that transaction</span>
@@ -1391,6 +1397,7 @@ $('theme').addEventListener('click', () => {
 $('pdf').addEventListener('click', () => window.print());
 $('about').addEventListener('click', () => { location.hash = '#about'; });
 $('homeAbout').addEventListener('click', () => { location.hash = '#about'; });
+$('ftog').addEventListener('click', () => { const m = $('foot').classList.toggle('mini'); $('ftog').textContent = m ? 'show legend ▼' : 'hide legend ▲'; });
 
 function kind(n){
   if (n.isTx) return 'batch';
@@ -1961,15 +1968,16 @@ function hideTip(){ tipEl.style.display = 'none'; }
 // pan / zoom
 let s = 1, tx = 0, ty = 0;
 const svg = $('svg');
-// panning stops when the graph is about to leave the view: at least PANKEEP px of it stay on screen
-const PANKEEP = 120;
+// panning stops at the edges of the graph: no edge of the graph moves more than PANPAD px into the view.
+// If the graph is smaller than the view on one side, it stays fully inside the view on that side.
+const PANPAD = 20;
 function clampView(){
   if (!gBox) return;
   const r = wrap.getBoundingClientRect(); if (!r.width || !r.height) return;
-  const kx = Math.min(PANKEEP, r.width / 3), ky = Math.min(PANKEEP, r.height / 3);
   const x0 = gBox.x * s, x1 = (gBox.x + gBox.width) * s, y0 = gBox.y * s, y1 = (gBox.y + gBox.height) * s;
-  tx = Math.min(Math.max(tx, kx - x1), r.width - kx - x0);
-  ty = Math.min(Math.max(ty, ky - y1), r.height - ky - y0);
+  const lim = (t, a, b) => Math.min(Math.max(t, Math.min(a, b)), Math.max(a, b));
+  tx = lim(tx, PANPAD - x0, r.width - PANPAD - x1);
+  ty = lim(ty, PANPAD - y0, r.height - PANPAD - y1);
 }
 const apply = () => { clampView(); vp.setAttribute('transform', `translate(${tx},${ty}) scale(${s})`); };
 function fit(){
